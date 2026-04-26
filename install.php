@@ -234,8 +234,8 @@ $currentStep = $step;
         <div class="form-group">
           <label>Basis-URL der Anwendung</label>
           <input type="url" name="app_url" value="<?= htmlspecialchars($_POST['app_url'] ?? APP_URL) ?>" required
-                 placeholder="https://meine-schule.de/fortbildungsmanager">
-          <small>Ohne abschließenden Schrägstrich.</small>
+                 placeholder="https://fobi.meinedomain.de">
+          <small>Subdomain ohne abschließenden Schrägstrich, z.B. <code>https://fobi.meinedomain.de</code></small>
         </div>
         <button type="submit" class="btn btn-primary">Verbindung testen & weiter</button>
       </form>

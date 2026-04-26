@@ -9,8 +9,8 @@ define('DB_USER', getenv('DB_USER') ?: 'fbm_user');
 define('DB_PASS', getenv('DB_PASS') ?: 'change_me_in_production');
 define('DB_CHARSET', 'utf8mb4');
 
-// Application base URL (no trailing slash)
-define('APP_URL', getenv('APP_URL') ?: 'http://localhost/fortbildungsmanager');
+// Application base URL (no trailing slash) – for subdomain deployment: https://fobi.meinedomain.de
+define('APP_URL', getenv('APP_URL') ?: 'http://fobi.localhost');
 
 // Application base path on filesystem
 define('APP_PATH', dirname(__DIR__));
