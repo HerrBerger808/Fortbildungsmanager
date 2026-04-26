@@ -56,11 +56,11 @@ APP_SEC=$(openssl rand -hex 24)
 
 # ── Anwendung deployen ────────────────────────────────────────────────
 mkdir -p "$DEST"
-# Kopiere alle Dateien außer dem setup-Ordner selbst
+# Kopiere alle Dateien; public/ wird der DocumentRoot, alles andere bleibt darüber.
 rsync -a --exclude='setup/' "$(dirname "$0")/../" "$DEST/"
 chown -R www-data:www-data "$DEST"
 chmod -R 755 "$DEST"
-chmod -R 775 "$DEST/config"
+chmod -R 775 "$DEST/config"   # config/ muss für den Installer schreibbar sein
 
 # ── Local config schreiben ────────────────────────────────────────────
 cat > "$DEST/config/local.php" <<PHP
@@ -108,15 +108,16 @@ else
 # HTTPS – Zertifikat noch einrichten (certbot --apache -d ${SERVER_NAME})
 <VirtualHost *:443>
     ServerName ${SERVER_NAME}
-    DocumentRoot ${DEST}
+    DocumentRoot ${DEST}/public
     SSLEngine on
     # SSLCertificateFile    /etc/letsencrypt/live/${SERVER_NAME}/fullchain.pem
     # SSLCertificateKeyFile /etc/letsencrypt/live/${SERVER_NAME}/privkey.pem
-    <Directory ${DEST}>
+    <Directory ${DEST}/public>
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
     </Directory>
+    # config/, src/, sql/ etc. liegen ausserhalb public/ – zur Sicherheit:
     <Directory ${DEST}/config>
         Require all denied
     </Directory>
@@ -155,5 +156,6 @@ echo
 echo "Bitte jetzt den Installationsassistenten aufrufen:"
 echo "  ${APP_URL}/install"
 echo
-echo "Danach setup/ und install.php aus dem Webverzeichnis entfernen:"
-echo "  rm -rf ${DEST}/setup ${DEST}/install.php"
+echo "Danach den Installer und das Setup-Verzeichnis entfernen:"
+echo "  rm -f  ${DEST}/public/install.php"
+echo "  rm -rf ${DEST}/setup"
