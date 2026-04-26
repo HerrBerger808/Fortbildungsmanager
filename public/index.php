@@ -1,16 +1,16 @@
 <?php
 // Front controller / router
+// public/ is the DocumentRoot; everything else lives one level up.
 
-require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/src/Router.php';
+require_once dirname(__DIR__) . '/bootstrap.php';
 
 // ── Public routes ────────────────────────────────────────────────────
 Router::get('/', function () {
-    include __DIR__ . '/pages/training_list.php';
+    include APP_PATH . '/pages/training_list.php';
 });
 
 Router::any('/login', function () {
-    include __DIR__ . '/pages/login.php';
+    include APP_PATH . '/pages/login.php';
 });
 
 Router::get('/logout', function () {
@@ -21,96 +21,96 @@ Router::get('/logout', function () {
 
 // Magic link verify
 Router::get('/auth/verify', function () {
-    include __DIR__ . '/api/auth.php';
+    include APP_PATH . '/api/auth.php';
 });
 
 // Registration confirm
 Router::get('/registration/confirm', function () {
-    include __DIR__ . '/api/registration_confirm.php';
+    include APP_PATH . '/api/registration_confirm.php';
 });
 
 // Email approve / reject buttons
 Router::any('/api/approve', function () {
-    include __DIR__ . '/api/approve.php';
+    include APP_PATH . '/api/approve.php';
 });
 Router::any('/api/reject', function () {
-    include __DIR__ . '/api/reject.php';
+    include APP_PATH . '/api/reject.php';
 });
 
 // Training detail
 Router::get('/training/:id', function (array $p) {
     $params = $p;
-    include __DIR__ . '/pages/training_detail.php';
+    include APP_PATH . '/pages/training_detail.php';
 });
 
 // Certificate (public)
 Router::get('/certificate', function () {
-    include __DIR__ . '/pages/certificate.php';
+    include APP_PATH . '/pages/certificate.php';
 });
 
 // ── Authenticated routes ─────────────────────────────────────────────
 Router::get('/dashboard', function () {
-    include __DIR__ . '/pages/dashboard.php';
+    include APP_PATH . '/pages/dashboard.php';
 });
 
 Router::post('/profile/name', function () {
-    include __DIR__ . '/api/profile_name.php';
+    include APP_PATH . '/api/profile_name.php';
 });
 
 // ── Approver ─────────────────────────────────────────────────────────
 Router::get('/approver', function () {
-    include __DIR__ . '/pages/approver_dashboard.php';
+    include APP_PATH . '/pages/approver_dashboard.php';
 });
 
 Router::post('/approver/decide', function () {
-    include __DIR__ . '/api/approver_decide.php';
+    include APP_PATH . '/api/approver_decide.php';
 });
 
 // ── Einsteller / Manager ──────────────────────────────────────────────
 Router::get('/manage', function () {
-    include __DIR__ . '/pages/manage_dashboard.php';
+    include APP_PATH . '/pages/manage_dashboard.php';
 });
 
 Router::any('/manage/training/create', function () {
     $params = [];
-    include __DIR__ . '/pages/training_form.php';
+    include APP_PATH . '/pages/training_form.php';
 });
 
 Router::any('/manage/training/:id/edit', function (array $p) {
     $params = $p;
-    include __DIR__ . '/pages/training_form.php';
+    include APP_PATH . '/pages/training_form.php';
 });
 
 Router::any('/manage/training/:id/participants', function (array $p) {
     $params = $p;
-    include __DIR__ . '/pages/participants.php';
+    include APP_PATH . '/pages/participants.php';
 });
 
 Router::any('/manage/training/:id/attendance', function (array $p) {
     $params = $p;
-    include __DIR__ . '/pages/attendance.php';
+    include APP_PATH . '/pages/attendance.php';
 });
 
 Router::any('/manage/bulk-approve', function () {
-    include __DIR__ . '/pages/bulk_approve.php';
+    include APP_PATH . '/pages/bulk_approve.php';
 });
 
 // ── Admin ─────────────────────────────────────────────────────────────
 Router::any('/admin', function () {
-    include __DIR__ . '/pages/admin_settings.php';
+    include APP_PATH . '/pages/admin_settings.php';
 });
 
 Router::any('/admin/users', function () {
-    include __DIR__ . '/pages/admin_users.php';
+    include APP_PATH . '/pages/admin_users.php';
 });
 
 Router::any('/admin/domains', function () {
-    include __DIR__ . '/pages/admin_domains.php';
+    include APP_PATH . '/pages/admin_domains.php';
 });
 
 // ── Install wizard (only if setup_complete = 0) ───────────────────────
 Router::any('/install', function () {
-    include __DIR__ . '/install.php';
+    include __DIR__ . '/install.php'; // install.php lives alongside index.php in public/
 });
 
 // ── Dispatch ──────────────────────────────────────────────────────────

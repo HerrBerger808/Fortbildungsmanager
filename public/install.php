@@ -5,7 +5,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/config/config.php';
+// public/ is the DocumentRoot; app root is one level up
+$appRoot = dirname(__DIR__);
+
+require_once $appRoot . '/config/config.php';
 
 $step    = (int)($_GET['step'] ?? 1);
 $errors  = [];
@@ -28,7 +31,7 @@ function tryConnect(string $host, string $port, string $db, string $user, string
 // Check if already installed
 $alreadyInstalled = false;
 try {
-    require_once __DIR__ . '/config/database.php';
+    require_once $appRoot . '/config/database.php';
     $val = Database::getSetting('setup_complete', '0');
     if ($val === '1') $alreadyInstalled = true;
 } catch (Throwable) {
@@ -75,7 +78,7 @@ define('DB_PASS', '{$dbPass}');
 define('APP_URL', '{$appUrl}');
 define('APP_SECRET', '{$appSec}');
 PHP;
-        file_put_contents(__DIR__ . '/config/local.php', $localConfig);
+        file_put_contents($appRoot . '/config/local.php', $localConfig);
         header('Location: ' . $appUrl . '/install?step=3');
         exit;
     }
@@ -84,8 +87,8 @@ PHP;
 // ── Step 3: Import schema ─────────────────────────────────────────────
 if ($step === 3) {
     try {
-        require_once __DIR__ . '/config/database.php';
-        $sql = file_get_contents(__DIR__ . '/sql/schema.sql');
+        require_once $appRoot . '/config/database.php';
+        $sql = file_get_contents($appRoot . '/sql/schema.sql');
         // Split by semicolon, execute each statement
         $statements = array_filter(array_map('trim', explode(';', $sql)));
         $pdo        = Database::getInstance();
@@ -101,7 +104,7 @@ if ($step === 3) {
 
 // ── Step 4: Create admin user ──────────────────────────────────────────
 if ($step === 4 && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_admin'])) {
-    require_once __DIR__ . '/config/database.php';
+    require_once $appRoot . '/config/database.php';
     $adminEmail  = strtolower(trim($_POST['admin_email'] ?? ''));
     $adminName   = trim($_POST['admin_name'] ?? '');
     $domain      = substr($adminEmail, strrpos($adminEmail, '@') + 1);
@@ -197,8 +200,8 @@ $currentStep = $step;
         <li>MariaDB / MySQL Datenbankzugang</li>
         <li>Apache2 mit <code>mod_rewrite</code></li>
       </ul>
-      <p>Bitte stellen Sie sicher, dass die Datei <code>config/local.php</code> schreibbar ist
-         (oder legen Sie sie manuell aus <code>config/config.php</code> an).</p>
+      <p>Bitte stellen Sie sicher, dass das Verzeichnis <code>config/</code> (eine Ebene über <code>public/</code>) für den Webserver schreibbar ist,
+         damit <code>config/local.php</code> angelegt werden kann.</p>
       <a href="?step=2" class="btn btn-primary">Weiter</a>
     </div>
 
