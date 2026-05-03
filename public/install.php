@@ -78,9 +78,14 @@ define('DB_PASS', '{$dbPass}');
 define('APP_URL', '{$appUrl}');
 define('APP_SECRET', '{$appSec}');
 PHP;
-        file_put_contents($appRoot . '/config/local.php', $localConfig);
-        header('Location: ' . $appUrl . '/install?step=3');
-        exit;
+        $localFile = $appRoot . '/config/local.php';
+        if (file_put_contents($localFile, $localConfig) === false) {
+            $errors[] = 'config/local.php konnte nicht geschrieben werden. Bitte prüfen Sie die Schreibrechte: chmod 775 /var/www/fobi/config';
+        } else {
+            chmod($localFile, 0640); // owner rw, group r, others nothing
+            header('Location: ' . $appUrl . '/install?step=3');
+            exit;
+        }
     }
 }
 

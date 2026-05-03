@@ -24,6 +24,21 @@ define('TOKEN_LIFETIME_MINUTES', 60);
 define('APP_SECRET', getenv('APP_SECRET') ?: 'change-this-secret-key-in-production-32chars');
 
 // Load local overrides if present
-if (file_exists(__DIR__ . '/local.php')) {
-    require_once __DIR__ . '/local.php';
+$_localConfig = __DIR__ . '/local.php';
+if (file_exists($_localConfig)) {
+    if (!is_readable($_localConfig)) {
+        // File exists but www-data cannot read it – fix with:
+        //   chown www-data:www-data /var/www/fobi/config/local.php
+        //   chmod 640 /var/www/fobi/config/local.php
+        http_response_code(500);
+        die(
+            '<h1>Konfigurationsfehler</h1>' .
+            '<p><code>config/local.php</code> existiert, ist aber nicht lesbar.</p>' .
+            '<p>Bitte auf dem Server ausführen:</p>' .
+            '<pre>chown www-data:www-data /var/www/fobi/config/local.php' . "\n" .
+            'chmod 640 /var/www/fobi/config/local.php</pre>'
+        );
+    }
+    require_once $_localConfig;
 }
+unset($_localConfig);
