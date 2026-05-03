@@ -19,7 +19,34 @@ class Database {
                 self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
             } catch (PDOException $e) {
                 error_log('DB Connection failed: ' . $e->getMessage());
-                die('Datenbankverbindung fehlgeschlagen. Bitte wenden Sie sich an den Administrator.');
+
+                // No local config → app not set up yet, go to installer
+                if (!file_exists(__DIR__ . '/local.php')) {
+                    header('Location: ' . APP_URL . '/install');
+                    exit;
+                }
+
+                // Real connection error – show helpful page (no credentials in output)
+                $hint = match (true) {
+                    str_contains($e->getMessage(), 'Access denied')         => 'Zugangsdaten in <code>config/local.php</code> prüfen (DB_USER / DB_PASS).',
+                    str_contains($e->getMessage(), 'Unknown database')      => 'Datenbank existiert nicht. Bitte zuerst anlegen: <code>CREATE DATABASE ' . DB_NAME . ';</code>',
+                    str_contains($e->getMessage(), 'Connection refused'),
+                    str_contains($e->getMessage(), "Can't connect")         => 'MariaDB läuft nicht oder ist auf dem falschen Port. Prüfen: <code>systemctl status mariadb</code>',
+                    default                                                 => htmlspecialchars($e->getMessage()),
+                };
+                http_response_code(500);
+                die(
+                    '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">' .
+                    '<title>Datenbankfehler</title>' .
+                    '<style>body{font-family:sans-serif;max-width:560px;margin:80px auto;padding:0 16px}' .
+                    'pre,code{background:#f4f4f4;padding:2px 6px;border-radius:4px}' .
+                    '.box{border:1px solid #f5c6cb;background:#fff5f5;border-radius:6px;padding:20px}</style>' .
+                    '</head><body><div class="box">' .
+                    '<h2>Datenbankverbindung fehlgeschlagen</h2>' .
+                    '<p>' . $hint . '</p>' .
+                    '<p><small>Details stehen im Apache-Error-Log.</small></p>' .
+                    '</div></body></html>'
+                );
             }
         }
         return self::$instance;
