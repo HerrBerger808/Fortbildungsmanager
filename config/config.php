@@ -27,16 +27,19 @@ define('APP_SECRET', getenv('APP_SECRET') ?: 'change-this-secret-key-in-producti
 $_localConfig = __DIR__ . '/local.php';
 if (file_exists($_localConfig)) {
     if (!is_readable($_localConfig)) {
-        // File exists but www-data cannot read it – fix with:
-        //   chown www-data:www-data /var/www/fobi/config/local.php
-        //   chmod 640 /var/www/fobi/config/local.php
+        // Determine the actual PHP process user for a precise fix command
+        $_phpUser = function_exists('posix_geteuid')
+            ? (posix_getpwuid(posix_geteuid())['name'] ?? 'www-data')
+            : 'www-data';
+        $_path = $_localConfig;
         http_response_code(500);
         die(
             '<h1>Konfigurationsfehler</h1>' .
             '<p><code>config/local.php</code> existiert, ist aber nicht lesbar.</p>' .
-            '<p>Bitte auf dem Server ausführen:</p>' .
-            '<pre>chown www-data:www-data /var/www/fobi/config/local.php' . "\n" .
-            'chmod 640 /var/www/fobi/config/local.php</pre>'
+            '<p>PHP läuft als Benutzer <strong>' . htmlspecialchars($_phpUser) . '</strong>. ' .
+            'Bitte auf dem Server ausführen:</p>' .
+            '<pre>chown ' . htmlspecialchars($_phpUser) . ':' . htmlspecialchars($_phpUser) . ' ' . htmlspecialchars($_path) . "\n" .
+            'chmod 640 ' . htmlspecialchars($_path) . '</pre>'
         );
     }
     require_once $_localConfig;
