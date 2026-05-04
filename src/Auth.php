@@ -105,7 +105,9 @@ class Auth {
 
         // Send email
         $link = APP_URL . '/auth/verify?token=' . urlencode($token);
-        Mail::sendMagicLink($email, $user['name'] ?? '', $link);
+        if (!Mail::sendMagicLink($email, $user['name'] ?? '', $link)) {
+            return 'mail_failed';
+        }
 
         return 'sent';
     }

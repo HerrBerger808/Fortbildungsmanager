@@ -1,7 +1,10 @@
 <?php
 Auth::requireRole('admin');
 
-$saved = false;
+$saved     = false;
+$testSent  = null; // true = success, false = failed
+$testEmail = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     $keys = ['app_name','app_url','mail_from','mail_from_name','mail_host','mail_port',
              'mail_username','mail_password','mail_encryption','cookie_lifetime_days','admin_email'];
@@ -11,6 +14,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
         }
     }
     $saved = true;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test'])) {
+    $testEmail = trim($_POST['test_email'] ?? '');
+    if (filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
+        $testSent = Mail::sendTest($testEmail);
+    } else {
+        $testSent = false;
+    }
 }
 
 // Load current settings
@@ -98,6 +110,27 @@ ob_start();
       <button type="submit" name="save_settings" value="1" class="btn btn-primary">Einstellungen speichern</button>
     </div>
   </form>
+
+  <div class="card" style="margin-top:24px">
+    <h2>E-Mail-Versand testen</h2>
+    <?php if ($testSent === true): ?>
+      <div class="alert alert-success">Test-E-Mail erfolgreich an <strong><?= htmlspecialchars($testEmail) ?></strong> gesendet.</div>
+    <?php elseif ($testSent === false): ?>
+      <div class="alert alert-error">Versand fehlgeschlagen. Bitte SMTP-Einstellungen prüfen und die Fehlermeldung im Apache Error-Log kontrollieren.</div>
+    <?php endif; ?>
+    <form method="post" class="form">
+      <div class="form-row" style="align-items:flex-end">
+        <div class="form-group" style="flex:1">
+          <label>Empfänger-E-Mail</label>
+          <input type="email" name="test_email" value="<?= htmlspecialchars($testEmail ?: (Database::getSetting('admin_email', ''))) ?>"
+                 placeholder="test@beispiel.de" required>
+        </div>
+        <div class="form-group" style="flex:0">
+          <button type="submit" name="send_test" value="1" class="btn btn-secondary">Test senden</button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 <?php
 $content   = ob_get_clean();

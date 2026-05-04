@@ -1,5 +1,5 @@
 <?php
-// Mail sending using PHP's mail() or SMTP via socket
+// Mail sending via SMTP (native socket implementation, no external dependencies)
 
 class Mail {
     private static bool $initialized = false;
@@ -8,39 +8,193 @@ class Mail {
     private static function init(): void {
         if (self::$initialized) return;
         self::$config = [
-            'host'      => Database::getSetting('mail_host', 'localhost'),
-            'port'      => (int)Database::getSetting('mail_port', '25'),
-            'username'  => Database::getSetting('mail_username', ''),
-            'password'  => Database::getSetting('mail_password', ''),
-            'from'      => Database::getSetting('mail_from', 'noreply@example.com'),
-            'from_name' => Database::getSetting('mail_from_name', 'Fortbildungsmanager'),
-            'encryption'=> Database::getSetting('mail_encryption', 'none'),
+            'host'       => Database::getSetting('mail_host', ''),
+            'port'       => (int)Database::getSetting('mail_port', '587'),
+            'username'   => Database::getSetting('mail_username', ''),
+            'password'   => Database::getSetting('mail_password', ''),
+            'from'       => Database::getSetting('mail_from', ''),
+            'from_name'  => Database::getSetting('mail_from_name', 'Fortbildungsmanager'),
+            'encryption' => Database::getSetting('mail_encryption', 'tls'),
         ];
         self::$initialized = true;
     }
 
-    /**
-     * Send an HTML email.
-     */
+    // ── Public interface ───────────────────────────────────────────────
+
     public static function send(string $to, string $toName, string $subject, string $htmlBody): bool {
         self::init();
+        if (empty(self::$config['host'])) {
+            error_log('Mail: SMTP-Host nicht konfiguriert. Bitte in Admin → Einstellungen → E-Mail konfigurieren.');
+            return false;
+        }
+        return self::smtpSend($to, $toName, $subject, $htmlBody);
+    }
 
-        $from     = self::$config['from'];
+    public static function sendTest(string $to): bool {
+        self::init();
+        $appName = Database::getSetting('app_name', 'Fortbildungsmanager');
+        $host    = self::$config['host'] ?: '(nicht konfiguriert)';
+        $port    = self::$config['port'];
+        $enc     = self::$config['encryption'];
+        $content = <<<HTML
+<p>Hallo,</p>
+<p>dies ist eine Test-E-Mail vom <strong>{$appName}</strong>.</p>
+<p>Der SMTP-Versand funktioniert korrekt.</p>
+<hr>
+<p><small>Server: {$host}:{$port} ({$enc})</small></p>
+HTML;
+        return self::send($to, '', "Test-E-Mail – {$appName}", self::layout($content, 'Test'));
+    }
+
+    // ── SMTP implementation ────────────────────────────────────────────
+
+    private static function smtpSend(string $to, string $toName, string $subject, string $htmlBody): bool {
+        $host = self::$config['host'];
+        $port = self::$config['port'];
+        $enc  = self::$config['encryption'];
+        $user = self::$config['username'];
+        $pass = self::$config['password'];
+        $from = self::$config['from'];
         $fromName = self::$config['from_name'];
 
-        // Build headers
-        $headers  = "MIME-Version: 1.0\r\n";
-        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-        $headers .= "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <{$from}>\r\n";
-        $headers .= "Reply-To: {$from}\r\n";
-        $headers .= "X-Mailer: Fortbildungsmanager\r\n";
+        $errno  = 0;
+        $errstr = '';
 
-        $toHeader = $toName ? "=?UTF-8?B?" . base64_encode($toName) . "?= <{$to}>" : $to;
+        // ssl:// = implicit TLS (port 465); tcp:// = plain or STARTTLS (port 587/25)
+        $address = ($enc === 'ssl') ? "ssl://{$host}:{$port}" : "tcp://{$host}:{$port}";
 
-        $subject = "=?UTF-8?B?" . base64_encode($subject) . "?=";
+        $ctx = stream_context_create([
+            'ssl' => [
+                'verify_peer'       => true,
+                'verify_peer_name'  => true,
+                'allow_self_signed' => false,
+            ],
+        ]);
 
-        return mail($toHeader, $subject, $htmlBody, $headers);
+        $socket = @stream_socket_client($address, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
+        if (!$socket) {
+            error_log("Mail SMTP: Verbindung zu {$address} fehlgeschlagen – {$errstr} ({$errno})");
+            return false;
+        }
+        stream_set_timeout($socket, 15);
+
+        try {
+            $greeting = self::smtpRead($socket);
+            if (self::smtpCode($greeting) !== 220) {
+                throw new RuntimeException("Ungültige Begrüßung: " . trim($greeting));
+            }
+
+            $myHost = gethostname() ?: 'localhost';
+
+            self::smtpExpect($socket, "EHLO {$myHost}", 250);
+
+            if ($enc === 'tls') {
+                self::smtpExpect($socket, 'STARTTLS', 220);
+                if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                    throw new RuntimeException('TLS-Aushandlung fehlgeschlagen');
+                }
+                self::smtpExpect($socket, "EHLO {$myHost}", 250);
+            }
+
+            if ($user !== '') {
+                self::smtpExpect($socket, 'AUTH LOGIN', 334);
+                self::smtpExpect($socket, base64_encode($user), 334);
+                self::smtpExpect($socket, base64_encode($pass), 235);
+            }
+
+            self::smtpExpect($socket, "MAIL FROM:<{$from}>", 250);
+            self::smtpExpect($socket, "RCPT TO:<{$to}>", 250);
+            self::smtpExpect($socket, 'DATA', 354);
+
+            fwrite($socket, self::buildMessage($from, $fromName, $to, $toName, $subject, $htmlBody));
+
+            $sent = self::smtpRead($socket);
+            self::smtpWrite($socket, 'QUIT');
+            self::smtpRead($socket);
+            fclose($socket);
+
+            if (self::smtpCode($sent) !== 250) {
+                throw new RuntimeException("Nachricht abgelehnt: " . trim($sent));
+            }
+            return true;
+
+        } catch (RuntimeException $e) {
+            error_log("Mail SMTP Fehler ({$host}:{$port}): " . $e->getMessage());
+            if (is_resource($socket) || (is_object($socket) && get_resource_type($socket) !== 'Unknown')) {
+                @fclose($socket);
+            }
+            return false;
+        }
     }
+
+    private static function buildMessage(
+        string $from, string $fromName,
+        string $to,   string $toName,
+        string $subject, string $htmlBody
+    ): string {
+        $encodedFrom = $fromName
+            ? '=?UTF-8?B?' . base64_encode($fromName) . "?= <{$from}>"
+            : $from;
+        $encodedTo = $toName
+            ? '=?UTF-8?B?' . base64_encode($toName) . "?= <{$to}>"
+            : $to;
+        $encodedSubj = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        $messageId   = '<' . uniqid('fbm', true) . '@' . (gethostname() ?: 'localhost') . '>';
+        $qpBody      = quoted_printable_encode($htmlBody);
+
+        // Dot-stuffing per RFC 5321 §4.5.2
+        if (str_starts_with($qpBody, '.')) {
+            $qpBody = '.' . $qpBody;
+        }
+        $qpBody = str_replace("\r\n.", "\r\n..", $qpBody);
+
+        $msg  = "Date: " . date('r') . "\r\n";
+        $msg .= "Message-ID: {$messageId}\r\n";
+        $msg .= "From: {$encodedFrom}\r\n";
+        $msg .= "To: {$encodedTo}\r\n";
+        $msg .= "Subject: {$encodedSubj}\r\n";
+        $msg .= "MIME-Version: 1.0\r\n";
+        $msg .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $msg .= "Content-Transfer-Encoding: quoted-printable\r\n";
+        $msg .= "X-Mailer: Fortbildungsmanager\r\n";
+        $msg .= "\r\n";
+        $msg .= $qpBody;
+        $msg .= "\r\n.\r\n"; // end-of-data marker
+
+        return $msg;
+    }
+
+    private static function smtpRead($socket): string {
+        $response = '';
+        while (!feof($socket)) {
+            $line = fgets($socket, 515);
+            if ($line === false) break;
+            $response .= $line;
+            if (strlen($line) >= 4 && $line[3] === ' ') break; // last line of response
+        }
+        return $response;
+    }
+
+    private static function smtpWrite($socket, string $data): void {
+        fwrite($socket, $data . "\r\n");
+    }
+
+    private static function smtpCode(string $response): int {
+        return (int)substr(trim($response), 0, 3);
+    }
+
+    private static function smtpExpect($socket, string $cmd, int $expected): string {
+        self::smtpWrite($socket, $cmd);
+        $resp = self::smtpRead($socket);
+        if (self::smtpCode($resp) !== $expected) {
+            throw new RuntimeException(
+                "Befehl '{$cmd}': erwartet {$expected}, erhalten: " . trim($resp)
+            );
+        }
+        return $resp;
+    }
+
+    // ── HTML email layout ──────────────────────────────────────────────
 
     private static function layout(string $content, string $title): string {
         $appName = Database::getSetting('app_name', 'Fortbildungsmanager');
@@ -73,6 +227,8 @@ class Mail {
 </html>
 HTML;
     }
+
+    // ── Specific mail types ────────────────────────────────────────────
 
     public static function sendMagicLink(string $to, string $name, string $link): bool {
         $greeting = $name ? "Hallo {$name}," : 'Hallo,';

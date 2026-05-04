@@ -20,6 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'invalid':
             $error = 'Bitte geben Sie eine gültige E-Mail-Adresse ein.';
             break;
+        case 'mail_failed':
+            $error = 'Der Anmeldelink konnte nicht versendet werden. Bitte wenden Sie sich an den Administrator – der SMTP-Versand ist möglicherweise nicht konfiguriert.';
+            break;
         default:
             $error = 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.';
     }
