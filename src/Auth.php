@@ -14,8 +14,8 @@ class Auth {
         if ($token === '') return;
 
         $user = Database::fetchOne(
-            'SELECT * FROM `users` WHERE `cookie_token` = ? AND `cookie_expires` > NOW() AND `status` = "active"',
-            [$token]
+            'SELECT * FROM `users` WHERE `cookie_token` = ? AND `cookie_expires` > ? AND `status` = "active"',
+            [$token, date('Y-m-d H:i:s')]
         );
         if ($user) {
             self::$currentUser = $user;
@@ -119,8 +119,8 @@ class Auth {
         $row = Database::fetchOne(
             'SELECT t.*, u.* FROM `tokens` t
              JOIN `users` u ON t.user_id = u.id
-             WHERE t.token = ? AND t.purpose = "magic_login" AND t.used = 0 AND t.expires_at > NOW()',
-            [$token]
+             WHERE t.token = ? AND t.purpose = "magic_login" AND t.used = 0 AND t.expires_at > ?',
+            [$token, date('Y-m-d H:i:s')]
         );
         if (!$row) return false;
         if ($row['status'] !== 'active') return false;
@@ -188,8 +188,8 @@ class Auth {
 
     public static function consumeActionToken(string $token, string $purpose): ?array {
         $row = Database::fetchOne(
-            'SELECT * FROM `tokens` WHERE `token` = ? AND `purpose` = ? AND `used` = 0 AND `expires_at` > NOW()',
-            [$token, $purpose]
+            'SELECT * FROM `tokens` WHERE `token` = ? AND `purpose` = ? AND `used` = 0 AND `expires_at` > ?',
+            [$token, $purpose, date('Y-m-d H:i:s')]
         );
         if (!$row) return null;
         Database::execute('UPDATE `tokens` SET `used` = 1 WHERE `id` = ?', [$row['id']]);
