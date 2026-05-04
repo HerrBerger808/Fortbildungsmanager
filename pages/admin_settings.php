@@ -6,7 +6,7 @@ $testSent  = null; // true = success, false = failed
 $testEmail = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
-    $keys = ['app_name','app_url','mail_from','mail_from_name','mail_host','mail_port',
+    $keys = ['app_name','app_url','mail_from','mail_from_name','mail_driver','mail_host','mail_port',
              'mail_username','mail_password','mail_encryption','cookie_lifetime_days','admin_email'];
     foreach ($keys as $k) {
         if (isset($_POST[$k])) {
@@ -66,6 +66,14 @@ ob_start();
 
     <div class="card">
       <h2>E-Mail-Versand</h2>
+      <div class="form-group">
+        <label>Versandmethode</label>
+        <select name="mail_driver" id="mail_driver" onchange="toggleSmtp(this.value)">
+          <option value="smtp" <?= ($settings['mail_driver']??'smtp') === 'smtp' ? 'selected' : '' ?>>SMTP (eigener Server / externe Dienste)</option>
+          <option value="mail" <?= ($settings['mail_driver']??'smtp') === 'mail' ? 'selected' : '' ?>>PHP mail() / lokaler MTA (msmtp, postfix, …)</option>
+        </select>
+        <small>„PHP mail()" nutzt den in <code>php.ini</code> konfigurierten <code>sendmail_path</code>.</small>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label>Absender-E-Mail</label>
@@ -76,6 +84,7 @@ ob_start();
           <input type="text" name="mail_from_name" value="<?= htmlspecialchars($settings['mail_from_name'] ?? '') ?>">
         </div>
       </div>
+      <div id="smtp_fields">
       <div class="form-row">
         <div class="form-group">
           <label>Mailserver (SMTP Host)</label>
@@ -104,7 +113,14 @@ ob_start();
           <input type="password" name="mail_password" value="<?= htmlspecialchars($settings['mail_password'] ?? '') ?>" autocomplete="new-password">
         </div>
       </div>
+      </div><!-- #smtp_fields -->
     </div>
+    <script>
+    function toggleSmtp(v) {
+      document.getElementById('smtp_fields').style.display = v === 'smtp' ? '' : 'none';
+    }
+    toggleSmtp(document.getElementById('mail_driver').value);
+    </script>
 
     <div class="form-actions">
       <button type="submit" name="save_settings" value="1" class="btn btn-primary">Einstellungen speichern</button>

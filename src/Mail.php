@@ -8,6 +8,7 @@ class Mail {
     private static function init(): void {
         if (self::$initialized) return;
         self::$config = [
+            'driver'     => Database::getSetting('mail_driver', 'smtp'),
             'host'       => Database::getSetting('mail_host', ''),
             'port'       => (int)Database::getSetting('mail_port', '587'),
             'username'   => Database::getSetting('mail_username', ''),
@@ -23,6 +24,9 @@ class Mail {
 
     public static function send(string $to, string $toName, string $subject, string $htmlBody): bool {
         self::init();
+        if (self::$config['driver'] === 'mail') {
+            return self::phpMailSend($to, $toName, $subject, $htmlBody);
+        }
         if (empty(self::$config['host'])) {
             error_log('Mail: SMTP-Host nicht konfiguriert. Bitte in Admin → Einstellungen → E-Mail konfigurieren.');
             return false;
@@ -33,17 +37,42 @@ class Mail {
     public static function sendTest(string $to): bool {
         self::init();
         $appName = Database::getSetting('app_name', 'Fortbildungsmanager');
-        $host    = self::$config['host'] ?: '(nicht konfiguriert)';
-        $port    = self::$config['port'];
-        $enc     = self::$config['encryption'];
+        $driver  = self::$config['driver'];
+        $info    = $driver === 'mail'
+            ? 'PHP mail() / lokaler MTA'
+            : (self::$config['host'] ?: '(nicht konfiguriert)') . ':' . self::$config['port'] . ' (' . self::$config['encryption'] . ')';
         $content = <<<HTML
 <p>Hallo,</p>
 <p>dies ist eine Test-E-Mail vom <strong>{$appName}</strong>.</p>
-<p>Der SMTP-Versand funktioniert korrekt.</p>
+<p>Der E-Mail-Versand funktioniert korrekt.</p>
 <hr>
-<p><small>Server: {$host}:{$port} ({$enc})</small></p>
+<p><small>Treiber: {$driver} &mdash; {$info}</small></p>
 HTML;
         return self::send($to, '', "Test-E-Mail – {$appName}", self::layout($content, 'Test'));
+    }
+
+    // ── PHP mail() fallback (uses system sendmail / msmtp / php.ini SMTP) ──
+
+    private static function phpMailSend(string $to, string $toName, string $subject, string $htmlBody): bool {
+        $from     = self::$config['from'];
+        $fromName = self::$config['from_name'];
+
+        $headers  = "MIME-Version: 1.0\r\n";
+        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $headers .= "Content-Transfer-Encoding: quoted-printable\r\n";
+        $headers .= 'From: =?UTF-8?B?' . base64_encode($fromName) . "?= <{$from}>\r\n";
+        $headers .= "Reply-To: {$from}\r\n";
+        $headers .= "X-Mailer: Fortbildungsmanager\r\n";
+
+        $toHeader    = $toName ? '=?UTF-8?B?' . base64_encode($toName) . "?= <{$to}>" : $to;
+        $subjEncoded = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        $body        = quoted_printable_encode($htmlBody);
+
+        $ok = @mail($toHeader, $subjEncoded, $body, $headers, "-f{$from}");
+        if (!$ok) {
+            error_log("Mail: PHP mail() fehlgeschlagen für {$to}");
+        }
+        return $ok;
     }
 
     // ── SMTP implementation ────────────────────────────────────────────
