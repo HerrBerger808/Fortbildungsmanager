@@ -14,6 +14,7 @@ INSERT INTO `settings` (`key`, `value`) VALUES
   ('app_name', 'Fortbildungsmanager'),
   ('app_url', 'http://localhost/fortbildungsmanager'),
   ('mail_driver', 'smtp'),
+  ('mail_ssl_verify', '0'),
   ('mail_from', 'noreply@example.com'),
   ('mail_from_name', 'Fortbildungsmanager'),
   ('mail_host', ''),

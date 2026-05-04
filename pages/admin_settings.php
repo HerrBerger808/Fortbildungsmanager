@@ -1,15 +1,18 @@
 <?php
 Auth::requireRole('admin');
 
-$saved     = false;
-$testSent  = null; // true = success, false = failed
-$testEmail = '';
+$saved      = false;
+$testSent   = null; // true = success, false = failed
+$testEmail  = '';
+$testError  = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     $keys = ['app_name','app_url','mail_from','mail_from_name','mail_driver','mail_host','mail_port',
-             'mail_username','mail_password','mail_encryption','cookie_lifetime_days','admin_email'];
+             'mail_username','mail_password','mail_encryption','mail_ssl_verify','cookie_lifetime_days','admin_email'];
     foreach ($keys as $k) {
-        if (isset($_POST[$k])) {
+        if ($k === 'mail_ssl_verify') {
+            Database::setSetting($k, isset($_POST[$k]) ? '1' : '0');
+        } elseif (isset($_POST[$k])) {
             Database::setSetting($k, trim($_POST[$k]));
         }
     }
@@ -19,9 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_test'])) {
     $testEmail = trim($_POST['test_email'] ?? '');
     if (filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
-        $testSent = Mail::sendTest($testEmail);
+        $testSent  = Mail::sendTest($testEmail);
+        $testError = Mail::getLastError();
     } else {
-        $testSent = false;
+        $testSent  = false;
+        $testError = 'Bitte eine gültige E-Mail-Adresse eingeben.';
     }
 }
 
@@ -113,6 +118,14 @@ ob_start();
           <input type="password" name="mail_password" value="<?= htmlspecialchars($settings['mail_password'] ?? '') ?>" autocomplete="new-password">
         </div>
       </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" name="mail_ssl_verify" value="1"
+                 <?= ($settings['mail_ssl_verify'] ?? '0') === '1' ? 'checked' : '' ?>>
+          SSL-Zertifikat des Mailservers prüfen
+        </label>
+        <small>Deaktiviert lassen, wenn der Mailserver ein selbst-signiertes oder internes Zertifikat verwendet.</small>
+      </div>
       </div><!-- #smtp_fields -->
     </div>
     <script>
@@ -132,7 +145,12 @@ ob_start();
     <?php if ($testSent === true): ?>
       <div class="alert alert-success">Test-E-Mail erfolgreich an <strong><?= htmlspecialchars($testEmail) ?></strong> gesendet.</div>
     <?php elseif ($testSent === false): ?>
-      <div class="alert alert-error">Versand fehlgeschlagen. Bitte SMTP-Einstellungen prüfen und die Fehlermeldung im Apache Error-Log kontrollieren.</div>
+      <div class="alert alert-error">
+        <strong>Versand fehlgeschlagen.</strong>
+        <?php if ($testError): ?>
+          <br><code><?= htmlspecialchars($testError) ?></code>
+        <?php endif; ?>
+      </div>
     <?php endif; ?>
     <form method="post" class="form">
       <div class="form-row" style="align-items:flex-end">

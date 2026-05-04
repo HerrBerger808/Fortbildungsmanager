@@ -2,8 +2,17 @@
 // Mail sending via SMTP (native socket implementation, no external dependencies)
 
 class Mail {
-    private static bool $initialized = false;
-    private static array $config = [];
+    private static bool   $initialized = false;
+    private static array  $config      = [];
+    private static string $lastError   = '';
+
+    public static function getLastError(): string { return self::$lastError; }
+
+    private static function fail(string $msg): false {
+        self::$lastError = $msg;
+        error_log('Mail: ' . $msg);
+        return false;
+    }
 
     private static function init(): void {
         if (self::$initialized) return;
@@ -16,6 +25,7 @@ class Mail {
             'from'       => Database::getSetting('mail_from', ''),
             'from_name'  => Database::getSetting('mail_from_name', 'Fortbildungsmanager'),
             'encryption' => Database::getSetting('mail_encryption', 'tls'),
+            'ssl_verify' => Database::getSetting('mail_ssl_verify', '0') === '1',
         ];
         self::$initialized = true;
     }
@@ -24,12 +34,12 @@ class Mail {
 
     public static function send(string $to, string $toName, string $subject, string $htmlBody): bool {
         self::init();
+        self::$lastError = '';
         if (self::$config['driver'] === 'mail') {
             return self::phpMailSend($to, $toName, $subject, $htmlBody);
         }
         if (empty(self::$config['host'])) {
-            error_log('Mail: SMTP-Host nicht konfiguriert. Bitte in Admin → Einstellungen → E-Mail konfigurieren.');
-            return false;
+            return self::fail('SMTP-Host nicht konfiguriert. Bitte in Admin → Einstellungen → E-Mail konfigurieren.');
         }
         return self::smtpSend($to, $toName, $subject, $htmlBody);
     }
@@ -86,41 +96,43 @@ HTML;
         $from = self::$config['from'];
         $fromName = self::$config['from_name'];
 
-        $errno  = 0;
-        $errstr = '';
+        $errno   = 0;
+        $errstr  = '';
+        $verify  = self::$config['ssl_verify'];
 
         // ssl:// = implicit TLS (port 465); tcp:// = plain or STARTTLS (port 587/25)
         $address = ($enc === 'ssl') ? "ssl://{$host}:{$port}" : "tcp://{$host}:{$port}";
 
         $ctx = stream_context_create([
             'ssl' => [
-                'verify_peer'       => true,
-                'verify_peer_name'  => true,
-                'allow_self_signed' => false,
+                'verify_peer'       => $verify,
+                'verify_peer_name'  => $verify,
+                'allow_self_signed' => !$verify,
             ],
         ]);
 
         $socket = @stream_socket_client($address, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
         if (!$socket) {
-            error_log("Mail SMTP: Verbindung zu {$address} fehlgeschlagen – {$errstr} ({$errno})");
-            return false;
+            return self::fail("Verbindung zu {$address} fehlgeschlagen: {$errstr} (Fehlercode {$errno})");
         }
         stream_set_timeout($socket, 15);
 
         try {
             $greeting = self::smtpRead($socket);
             if (self::smtpCode($greeting) !== 220) {
-                throw new RuntimeException("Ungültige Begrüßung: " . trim($greeting));
+                throw new RuntimeException("Ungültige Server-Begrüßung: " . trim($greeting));
             }
 
             $myHost = gethostname() ?: 'localhost';
-
             self::smtpExpect($socket, "EHLO {$myHost}", 250);
 
             if ($enc === 'tls') {
                 self::smtpExpect($socket, 'STARTTLS', 220);
                 if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
-                    throw new RuntimeException('TLS-Aushandlung fehlgeschlagen');
+                    throw new RuntimeException(
+                        'TLS-Aushandlung fehlgeschlagen' .
+                        ($verify ? '' : ' – versuchen Sie es mit deaktivierter SSL-Zertifikatsprüfung')
+                    );
                 }
                 self::smtpExpect($socket, "EHLO {$myHost}", 250);
             }
@@ -143,16 +155,13 @@ HTML;
             fclose($socket);
 
             if (self::smtpCode($sent) !== 250) {
-                throw new RuntimeException("Nachricht abgelehnt: " . trim($sent));
+                throw new RuntimeException("Server hat die Nachricht abgelehnt: " . trim($sent));
             }
             return true;
 
         } catch (RuntimeException $e) {
-            error_log("Mail SMTP Fehler ({$host}:{$port}): " . $e->getMessage());
-            if (is_resource($socket) || (is_object($socket) && get_resource_type($socket) !== 'Unknown')) {
-                @fclose($socket);
-            }
-            return false;
+            @fclose($socket);
+            return self::fail("SMTP {$host}:{$port}: " . $e->getMessage());
         }
     }
 
