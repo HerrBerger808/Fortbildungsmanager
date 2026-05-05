@@ -38,7 +38,7 @@ Router::any('/api/reject', function () {
 });
 
 // Training detail
-Router::get('/training/:id', function (array $p) {
+Router::any('/training/:id', function (array $p) {
     $params = $p;
     include APP_PATH . '/pages/training_detail.php';
 });

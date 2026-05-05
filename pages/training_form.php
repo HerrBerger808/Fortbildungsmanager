@@ -298,6 +298,29 @@ ob_start();
 const genehmiger = <?= json_encode(array_map(fn($g) => ['id' => $g['id'], 'label' => $g['name'] ?: $g['email']], $genehmiger)) ?>;
 let sessionCount = <?= count($sessions) ?>;
 
+function autoFillEndTime(row) {
+  const startEl = row.querySelector('input[name="session_start[]"]');
+  const endEl   = row.querySelector('input[name="session_end[]"]');
+  if (!startEl || !endEl) return;
+  startEl.addEventListener('change', function () {
+    if (!this.value) return;
+    const start = new Date(this.value);
+    if (isNaN(start)) return;
+    // Only fill if end is still empty or equal to start+1h from previous start
+    const expected = endEl.dataset.autoEnd || '';
+    if (endEl.value === '' || endEl.value === expected) {
+      start.setHours(start.getHours() + 1);
+      const pad = n => String(n).padStart(2, '0');
+      const val = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}T${pad(start.getHours())}:${pad(start.getMinutes())}`;
+      endEl.value = val;
+      endEl.dataset.autoEnd = val;
+    }
+  });
+}
+
+// Wire existing session rows
+document.querySelectorAll('.session-row').forEach(autoFillEndTime);
+
 function addApprover(level) {
   const container = document.getElementById('level' + level + '-list');
   const div = document.createElement('div');
@@ -348,6 +371,7 @@ document.getElementById('add-session').addEventListener('click', () => {
     </div>`;
   container.appendChild(div);
   div.querySelector('.remove-session').addEventListener('click', () => div.remove());
+  autoFillEndTime(div);
 });
 
 document.querySelectorAll('.remove-session').forEach(btn => {

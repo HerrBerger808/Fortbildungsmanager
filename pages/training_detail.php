@@ -1,5 +1,11 @@
 <?php
-// Training detail & registration
+// Training detail & registration – login required
+if (!Auth::isLoggedIn()) {
+    $trainingId = (int)($params['id'] ?? 0);
+    header('Location: ' . APP_URL . '/login?back=' . urlencode('/training/' . $trainingId));
+    exit;
+}
+
 $trainingId = (int)($params['id'] ?? 0);
 $training   = Training::getById($trainingId);
 

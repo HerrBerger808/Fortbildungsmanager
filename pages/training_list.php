@@ -1,5 +1,10 @@
 <?php
-// Public training list
+// Public training list – login required
+if (!Auth::isLoggedIn()) {
+    header('Location: ' . APP_URL . '/login?back=' . urlencode('/'));
+    exit;
+}
+
 $trainings = Training::getAll('open');
 $user      = Auth::user();
 
