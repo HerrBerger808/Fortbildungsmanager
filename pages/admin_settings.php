@@ -38,6 +38,11 @@ foreach ($rows as $r) $settings[$r['key']] = $r['value'];
 ob_start();
 ?>
 <div class="container">
+  <div class="admin-tabs">
+    <a href="<?= APP_URL ?>/admin" class="tab active">Einstellungen</a>
+    <a href="<?= APP_URL ?>/admin/users" class="tab">Nutzer</a>
+    <a href="<?= APP_URL ?>/admin/domains" class="tab">Domains</a>
+  </div>
   <h1>Einstellungen</h1>
 
   <?php if ($saved): ?>

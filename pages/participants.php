@@ -43,7 +43,12 @@ ob_start();
     <a href="<?= APP_URL ?>/manage/training/<?= $trainingId ?>/edit"><?= htmlspecialchars($training['title']) ?></a>
     &rsaquo; Teilnehmer
   </div>
-  <h1>Teilnehmer: <?= htmlspecialchars($training['title']) ?></h1>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <h1 style="margin:0">Teilnehmer: <?= htmlspecialchars($training['title']) ?></h1>
+    <a href="<?= APP_URL ?>/manage/training/<?= $trainingId ?>/export" class="btn btn-secondary">
+      ↓ CSV Export
+    </a>
+  </div>
 
   <?php foreach (['pending_approval','approved','waitlist','rejected','pending_confirm','cancelled'] as $status): ?>
     <?php if (empty($byStatus[$status])) continue; ?>

@@ -62,6 +62,7 @@ ob_start();
                 <a href="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/edit" class="btn btn-sm btn-secondary">Bearbeiten</a>
                 <a href="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/participants" class="btn btn-sm btn-secondary">Teilnehmer</a>
                 <a href="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/attendance" class="btn btn-sm btn-secondary">Anwesenheit</a>
+                <a href="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/export" class="btn btn-sm btn-secondary">↓ Export</a>
                 <form method="post" action="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/delete" style="display:inline"
                       onsubmit="return confirm('Fortbildung »<?= htmlspecialchars(addslashes($t['title'])) ?>« wirklich löschen?\nDie Nummer #<?= $t['public_id'] ?> wird nicht mehr vergeben.')">
                   <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
