@@ -44,7 +44,7 @@ ob_start();
         ?>
         <div class="training-card">
           <div class="training-card-header">
-            <h2><a href="<?= APP_URL ?>/training/<?= $t['id'] ?>"><?= htmlspecialchars($t['title']) ?></a></h2>
+            <h2><a href="<?= APP_URL ?>/training/<?= $t['public_id'] ?>"><?= htmlspecialchars($t['title']) ?></a></h2>
             <?php if ($t['is_multi_part']): ?>
               <span class="badge badge-info">Mehrteilig</span>
             <?php endif; ?>
@@ -81,7 +81,7 @@ ob_start();
                 <?= Registration::getStatusLabel($myReg['status']) ?>
               </span>
             <?php else: ?>
-              <a href="<?= APP_URL ?>/training/<?= $t['id'] ?>" class="btn btn-primary btn-sm">Details & Anmelden</a>
+              <a href="<?= APP_URL ?>/training/<?= $t['public_id'] ?>" class="btn btn-primary btn-sm">Details & Anmelden</a>
             <?php endif; ?>
           </div>
         </div>

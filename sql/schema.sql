@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS `tokens` (
 
 CREATE TABLE IF NOT EXISTS `trainings` (
   `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `public_id` INT UNSIGNED NOT NULL UNIQUE,
   `creator_id` INT UNSIGNED NOT NULL,
   `title` VARCHAR(255) NOT NULL,
   `description` TEXT,
@@ -75,6 +76,7 @@ CREATE TABLE IF NOT EXISTS `trainings` (
   `approval_mode` ENUM('auto','manual_individual','manual_bulk') NOT NULL DEFAULT 'auto',
   `registration_deadline` DATETIME DEFAULT NULL,
   `status` ENUM('draft','open','closed','archived') NOT NULL DEFAULT 'draft',
+  `deleted_at` DATETIME DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`creator_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT

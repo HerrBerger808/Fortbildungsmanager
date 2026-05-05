@@ -81,6 +81,11 @@ Router::any('/manage/training/:id/edit', function (array $p) {
     include APP_PATH . '/pages/training_form.php';
 });
 
+Router::post('/manage/training/:id/delete', function (array $p) {
+    $params = $p;
+    include APP_PATH . '/api/training_delete.php';
+});
+
 Router::any('/manage/training/:id/participants', function (array $p) {
     $params = $p;
     include APP_PATH . '/pages/participants.php';

@@ -3,15 +3,44 @@
 
 class Training {
 
+    // ── Public-ID generation ───────────────────────────────────────────
+
+    private static function generatePublicId(): int {
+        $total = (int)(Database::fetchOne('SELECT COUNT(*) AS c FROM `trainings`')['c'] ?? 0);
+
+        if ($total < 1000) {
+            [$min, $max] = [1000, 9999];
+        } elseif ($total < 100000) {
+            [$min, $max] = [10000, 99999];
+        } else {
+            // Sequential once the random space gets crowded
+            $row = Database::fetchOne('SELECT COALESCE(MAX(public_id), 99999) AS m FROM `trainings`');
+            return max((int)$row['m'] + 1, 100000);
+        }
+
+        for ($i = 0; $i < 500; $i++) {
+            $id = random_int($min, $max);
+            if (!Database::fetchOne('SELECT 1 FROM `trainings` WHERE `public_id` = ?', [$id])) {
+                return $id;
+            }
+        }
+        // Fallback: max+1 within current range
+        $row = Database::fetchOne('SELECT COALESCE(MAX(public_id), ' . ($min - 1) . ') AS m FROM `trainings`');
+        return (int)$row['m'] + 1;
+    }
+
+    // ── Queries ────────────────────────────────────────────────────────
+
     public static function getAll(string $status = null): array {
         $sql = 'SELECT t.*, u.name AS creator_name, u.email AS creator_email,
                        (SELECT COUNT(*) FROM registrations r WHERE r.training_id = t.id AND r.status = "approved") AS approved_count,
                        (SELECT COUNT(*) FROM registrations r WHERE r.training_id = t.id AND r.status = "waitlist") AS waitlist_count
                 FROM `trainings` t
-                JOIN `users` u ON t.creator_id = u.id';
+                JOIN `users` u ON t.creator_id = u.id
+                WHERE t.deleted_at IS NULL';
         $params = [];
         if ($status) {
-            $sql .= ' WHERE t.status = ?';
+            $sql .= ' AND t.status = ?';
             $params[] = $status;
         }
         $sql .= ' ORDER BY t.created_at DESC';
@@ -25,19 +54,31 @@ class Training {
                     (SELECT COUNT(*) FROM registrations r WHERE r.training_id = t.id AND r.status = "pending_approval") AS pending_count,
                     (SELECT COUNT(*) FROM registrations r WHERE r.training_id = t.id AND r.status = "waitlist") AS waitlist_count
              FROM `trainings` t
-             WHERE t.creator_id = ?
+             WHERE t.creator_id = ? AND t.deleted_at IS NULL
              ORDER BY t.created_at DESC',
             [$userId]
         );
     }
 
+    /** Lookup by internal auto-increment id (used by management routes). */
     public static function getById(int $id): ?array {
         return Database::fetchOne(
             'SELECT t.*, u.name AS creator_name, u.email AS creator_email
              FROM `trainings` t
              JOIN `users` u ON t.creator_id = u.id
-             WHERE t.id = ?',
+             WHERE t.id = ? AND t.deleted_at IS NULL',
             [$id]
+        );
+    }
+
+    /** Lookup by public_id (used by /training/:id public routes). */
+    public static function getByPublicId(int $publicId): ?array {
+        return Database::fetchOne(
+            'SELECT t.*, u.name AS creator_name, u.email AS creator_email
+             FROM `trainings` t
+             JOIN `users` u ON t.creator_id = u.id
+             WHERE t.public_id = ? AND t.deleted_at IS NULL',
+            [$publicId]
         );
     }
 
@@ -49,13 +90,15 @@ class Training {
     }
 
     public static function create(array $data, int $creatorId): int {
+        $publicId = self::generatePublicId();
         Database::execute(
             'INSERT INTO `trainings`
-             (`creator_id`, `title`, `description`, `location`, `is_multi_part`,
+             (`public_id`, `creator_id`, `title`, `description`, `location`, `is_multi_part`,
               `max_participants`, `waitlist_enabled`, `approval_mode`,
               `registration_deadline`, `status`)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
+                $publicId,
                 $creatorId,
                 $data['title'],
                 $data['description'] ?? '',
@@ -94,6 +137,14 @@ class Training {
         );
     }
 
+    /** Soft-delete: marks deleted_at, public_id is never reused. */
+    public static function delete(int $id): void {
+        Database::execute(
+            'UPDATE `trainings` SET `deleted_at` = ? WHERE `id` = ?',
+            [date('Y-m-d H:i:s'), $id]
+        );
+    }
+
     public static function addSession(int $trainingId, array $data): int {
         Database::execute(
             'INSERT INTO `training_sessions` (`training_id`, `session_number`, `title`, `start_datetime`, `end_datetime`, `location`, `notes`)
@@ -123,7 +174,8 @@ class Training {
         Database::execute('DELETE FROM `training_sessions` WHERE `id` = ?', [$sessionId]);
     }
 
-    // Approval levels management
+    // ── Approval levels ────────────────────────────────────────────────
+
     public static function getApprovalLevels(int $trainingId): array {
         return Database::fetchAll(
             'SELECT al.*, u.name, u.email
@@ -136,7 +188,6 @@ class Training {
     }
 
     public static function setApprovalLevels(int $trainingId, array $levelUsers): void {
-        // $levelUsers = [[level => 1, user_id => X], ...]
         Database::execute('DELETE FROM `approval_levels` WHERE `training_id` = ?', [$trainingId]);
         foreach ($levelUsers as $entry) {
             if (empty($entry['user_id'])) continue;
@@ -155,7 +206,8 @@ class Training {
         return $row ? (int)$row['max_level'] : 0;
     }
 
-    // Registration helpers
+    // ── Registration helpers ───────────────────────────────────────────
+
     public static function getApprovedCount(int $trainingId): int {
         $row = Database::fetchOne(
             'SELECT COUNT(*) AS cnt FROM `registrations` WHERE `training_id` = ? AND `status` = "approved"',
@@ -196,6 +248,7 @@ class Training {
              JOIN `trainings` t ON r.training_id = t.id
              WHERE t.creator_id = ? AND r.status = "pending_approval"
              AND t.approval_mode = "manual_bulk"
+             AND t.deleted_at IS NULL
              AND (t.registration_deadline IS NULL OR t.registration_deadline <= NOW())
              ORDER BY t.title, r.created_at',
             [$creatorId]

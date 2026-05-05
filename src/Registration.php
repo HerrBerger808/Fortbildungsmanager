@@ -342,12 +342,12 @@ class Registration {
     public static function getForApprover(int $approverId): array {
         return Database::fetchAll(
             'SELECT r.*, u.name AS participant_name, u.email AS participant_email,
-                    t.title AS training_title, t.id AS training_id, al.level
+                    t.title AS training_title, t.id AS training_id, t.public_id AS training_public_id, al.level
              FROM `registrations` r
              JOIN `users` u ON r.user_id = u.id
              JOIN `trainings` t ON r.training_id = t.id
              JOIN `approval_levels` al ON al.training_id = t.id AND al.user_id = ?
-             WHERE r.status = "pending_approval"
+             WHERE r.status = "pending_approval" AND t.deleted_at IS NULL
              ORDER BY r.created_at',
             [$approverId]
         );

@@ -118,7 +118,20 @@ ob_start();
   <div class="breadcrumb">
     <a href="<?= APP_URL ?>/manage">Verwaltung</a> &rsaquo; <?= $isEdit ? htmlspecialchars($training['title'] ?? 'Bearbeiten') : 'Neue Fortbildung' ?>
   </div>
-  <h1><?= $isEdit ? 'Fortbildung bearbeiten' : 'Neue Fortbildung' ?></h1>
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <h1 style="margin:0"><?= $isEdit ? 'Fortbildung bearbeiten' : 'Neue Fortbildung' ?></h1>
+    <?php if ($isEdit && $training): ?>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a href="<?= APP_URL ?>/training/<?= $training['public_id'] ?>" class="btn btn-sm btn-secondary" target="_blank">
+          Ansicht #<?= $training['public_id'] ?>
+        </a>
+        <form method="post" action="<?= APP_URL ?>/manage/training/<?= $trainingId ?>/delete"
+              onsubmit="return confirm('Fortbildung »<?= htmlspecialchars(addslashes($training['title'])) ?>« wirklich löschen?\nDie Nummer #<?= $training['public_id'] ?> wird nicht mehr vergeben.')">
+          <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+        </form>
+      </div>
+    <?php endif; ?>
+  </div>
 
   <?php if (!empty($errors)): ?>
     <div class="alert alert-error">

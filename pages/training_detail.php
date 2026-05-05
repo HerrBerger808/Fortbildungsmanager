@@ -1,13 +1,8 @@
 <?php
-// Training detail & registration – login required
-if (!Auth::isLoggedIn()) {
-    $trainingId = (int)($params['id'] ?? 0);
-    header('Location: ' . APP_URL . '/login?back=' . urlencode('/training/' . $trainingId));
-    exit;
-}
-
-$trainingId = (int)($params['id'] ?? 0);
-$training   = Training::getById($trainingId);
+// Training detail & registration – accessible via direct link without login
+$publicId = (int)($params['id'] ?? 0);
+$training = Training::getByPublicId($publicId);
+$trainingId = $training ? (int)$training['id'] : 0;
 
 if (!$training || $training['status'] === 'archived') {
     http_response_code(404);

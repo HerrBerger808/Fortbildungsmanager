@@ -9,11 +9,12 @@ $pending     = Registration::getForApprover($user['id']);
 $creatorPending = [];
 if (in_array($user['role'], ['admin', 'einsteller'])) {
     $creatorPending = Database::fetchAll(
-        'SELECT r.*, u.name AS participant_name, u.email AS participant_email, t.title AS training_title, t.id AS training_id
+        'SELECT r.*, u.name AS participant_name, u.email AS participant_email,
+                t.title AS training_title, t.id AS training_id, t.public_id AS training_public_id
          FROM `registrations` r
          JOIN `users` u ON r.user_id = u.id
          JOIN `trainings` t ON r.training_id = t.id
-         WHERE t.creator_id = ? AND r.status = "pending_approval"
+         WHERE t.creator_id = ? AND r.status = "pending_approval" AND t.deleted_at IS NULL
          ORDER BY r.created_at',
         [$user['id']]
     );
@@ -52,7 +53,7 @@ ob_start();
         <tbody>
           <?php foreach ($all as $r): ?>
             <tr>
-              <td><a href="<?= APP_URL ?>/training/<?= $r['training_id'] ?>"><?= htmlspecialchars($r['training_title']) ?></a></td>
+              <td><a href="<?= APP_URL ?>/training/<?= $r['training_public_id'] ?>"><?= htmlspecialchars($r['training_title']) ?></a></td>
               <td>
                 <?= htmlspecialchars($r['participant_name'] ?: $r['participant_email']) ?>
                 <br><small><?= htmlspecialchars($r['participant_email']) ?></small>
@@ -82,7 +83,7 @@ ob_start();
   <!-- Past decisions -->
   <?php
   $past = Database::fetchAll(
-      'SELECT ad.*, r.training_id, t.title AS training_title,
+      'SELECT ad.*, r.training_id, t.title AS training_title, t.public_id AS training_public_id,
               u.name AS participant_name, u.email AS participant_email
        FROM `approval_decisions` ad
        JOIN `registrations` r ON ad.registration_id = r.id

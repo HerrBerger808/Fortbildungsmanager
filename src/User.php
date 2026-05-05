@@ -101,12 +101,12 @@ class User {
 
     public static function getMyTrainings(int $userId): array {
         return Database::fetchAll(
-            'SELECT r.*, t.title, t.status AS training_status, t.is_multi_part,
+            'SELECT r.*, t.title, t.public_id, t.status AS training_status, t.is_multi_part,
                     MIN(ts.start_datetime) AS next_session
              FROM `registrations` r
              JOIN `trainings` t ON r.training_id = t.id
              LEFT JOIN `training_sessions` ts ON ts.training_id = t.id AND ts.start_datetime >= NOW()
-             WHERE r.user_id = ?
+             WHERE r.user_id = ? AND t.deleted_at IS NULL
              GROUP BY r.id
              ORDER BY next_session, t.title',
             [$userId]

@@ -311,7 +311,7 @@ HTML;
         $content = <<<HTML
 <p>{$greeting}</p>
 <p>Ihre Anmeldung zur Fortbildung <strong>{$title}</strong> wurde <strong>genehmigt</strong>. Wir freuen uns auf Ihre Teilnahme!</p>
-<p><a href="{$appUrl}/training/{$training['id']}" class="btn btn-green">Zur Fortbildung</a></p>
+<p><a href="{$appUrl}/training/{$training['public_id']}" class="btn btn-green">Zur Fortbildung</a></p>
 HTML;
         return self::send($to, $name, "Anmeldung genehmigt: {$training['title']}", self::layout($content, 'Genehmigt'));
     }

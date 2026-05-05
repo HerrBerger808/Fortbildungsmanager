@@ -34,7 +34,10 @@ ob_start();
         <tbody>
           <?php foreach ($trainings as $t): ?>
             <tr>
-              <td><a href="<?= APP_URL ?>/training/<?= $t['id'] ?>"><?= htmlspecialchars($t['title']) ?></a></td>
+              <td>
+                <a href="<?= APP_URL ?>/training/<?= $t['public_id'] ?>"><?= htmlspecialchars($t['title']) ?></a>
+                <small class="text-muted">#<?= $t['public_id'] ?></small>
+              </td>
               <td>
                 <span class="badge badge-<?= match($t['status']) {
                   'open'     => 'success',
@@ -59,6 +62,10 @@ ob_start();
                 <a href="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/edit" class="btn btn-sm btn-secondary">Bearbeiten</a>
                 <a href="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/participants" class="btn btn-sm btn-secondary">Teilnehmer</a>
                 <a href="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/attendance" class="btn btn-sm btn-secondary">Anwesenheit</a>
+                <form method="post" action="<?= APP_URL ?>/manage/training/<?= $t['id'] ?>/delete" style="display:inline"
+                      onsubmit="return confirm('Fortbildung »<?= htmlspecialchars(addslashes($t['title'])) ?>« wirklich löschen?\nDie Nummer #<?= $t['public_id'] ?> wird nicht mehr vergeben.')">
+                  <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                </form>
               </td>
             </tr>
           <?php endforeach; ?>

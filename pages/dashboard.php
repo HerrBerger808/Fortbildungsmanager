@@ -33,10 +33,10 @@ ob_start();
         <tbody>
           <?php foreach ($myRegs as $reg): ?>
             <tr>
-              <td><a href="<?= APP_URL ?>/training/<?= $reg['training_id'] ?>"><?= htmlspecialchars($reg['title']) ?></a></td>
+              <td><a href="<?= APP_URL ?>/training/<?= $reg['public_id'] ?>"><?= htmlspecialchars($reg['title']) ?></a></td>
               <td><span class="badge <?= Registration::getStatusClass($reg['status']) ?>"><?= Registration::getStatusLabel($reg['status']) ?></span></td>
               <td><?= $reg['next_session'] ? date('d.m.Y', strtotime($reg['next_session'])) : '–' ?></td>
-              <td><a href="<?= APP_URL ?>/training/<?= $reg['training_id'] ?>">Details</a></td>
+              <td><a href="<?= APP_URL ?>/training/<?= $reg['public_id'] ?>">Details</a></td>
             </tr>
           <?php endforeach; ?>
         </tbody>
