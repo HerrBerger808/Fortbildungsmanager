@@ -413,4 +413,33 @@ HTML;
 HTML;
         return self::send($to, $name, 'Ihr Konto wurde freigeschaltet', self::layout($content, 'Konto freigeschaltet'));
     }
+
+    public static function sendCustomMessage(string $to, string $name, array $training, string $subject, string $body): bool {
+        $greeting  = $name ? "Hallo {$name}," : 'Hallo,';
+        $title     = htmlspecialchars($training['title']);
+        $bodyHtml  = nl2br(htmlspecialchars($body));
+        $content   = <<<HTML
+<p>{$greeting}</p>
+<p><strong>Nachricht zur Fortbildung „{$title}"</strong></p>
+<hr>
+<p>{$bodyHtml}</p>
+HTML;
+        return self::send($to, $name, $subject, self::layout($content, $subject));
+    }
+
+    public static function sendReminder(string $to, string $name, array $training, string $nextSession = '', string $extraText = ''): bool {
+        $greeting     = $name ? "Hallo {$name}," : 'Hallo,';
+        $title        = htmlspecialchars($training['title']);
+        $sessionHtml  = $nextSession ? '<p>Nächster Termin: <strong>' . htmlspecialchars($nextSession) . '</strong></p>' : '';
+        $extraHtml    = $extraText ? '<hr><p>' . nl2br(htmlspecialchars($extraText)) . '</p>' : '';
+        $appUrl       = APP_URL;
+        $content      = <<<HTML
+<p>{$greeting}</p>
+<p>Dies ist eine Erinnerung an Ihre Teilnahme an der Fortbildung <strong>{$title}</strong>.</p>
+{$sessionHtml}
+{$extraHtml}
+<p><a href="{$appUrl}/training/{$training['public_id']}" class="btn btn-blue">Zur Fortbildung</a></p>
+HTML;
+        return self::send($to, $name, "Erinnerung: {$training['title']}", self::layout($content, 'Erinnerung'));
+    }
 }

@@ -96,6 +96,11 @@ Router::any('/manage/training/:id/participants', function (array $p) {
     include APP_PATH . '/pages/participants.php';
 });
 
+Router::post('/manage/training/:id/message', function (array $p) {
+    $params = $p;
+    include APP_PATH . '/api/participants_message.php';
+});
+
 Router::any('/manage/training/:id/attendance', function (array $p) {
     $params = $p;
     include APP_PATH . '/pages/attendance.php';

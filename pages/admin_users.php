@@ -99,14 +99,33 @@ ob_start();
   </div>
 
   <div class="card">
-    <h2>Alle Nutzer (<?= count($users) ?>)</h2>
-    <table class="table">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <h2 style="margin:0">Alle Nutzer (<span id="user-count"><?= count($users) ?></span>)</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" id="filter-text" placeholder="Name oder E-Mail …" style="min-width:180px">
+        <select id="filter-role">
+          <option value="">Alle Rollen</option>
+          <option value="admin">Administrator</option>
+          <option value="einsteller">Einsteller</option>
+          <option value="genehmiger">Genehmiger</option>
+          <option value="teilnehmer">Teilnehmer/in</option>
+        </select>
+        <select id="filter-status">
+          <option value="">Alle Status</option>
+          <option value="active">Aktiv</option>
+          <option value="pending">Ausstehend</option>
+          <option value="blocked">Gesperrt</option>
+        </select>
+      </div>
+    </div>
+    <table class="table" id="user-table">
       <thead>
         <tr><th>E-Mail</th><th>Name</th><th>Rolle</th><th>Status</th><th>Letzte Anmeldung</th><th>Aktionen</th></tr>
       </thead>
       <tbody>
         <?php foreach ($users as $u): ?>
-          <tr>
+          <tr data-role="<?= $u['role'] ?>" data-status="<?= $u['status'] ?>"
+              data-search="<?= htmlspecialchars(strtolower(($u['email'] ?? '') . ' ' . ($u['name'] ?? ''))) ?>">
             <td><?= htmlspecialchars($u['email']) ?></td>
             <td><?= htmlspecialchars($u['name'] ?? '–') ?></td>
             <td>
@@ -145,8 +164,36 @@ ob_start();
         <?php endforeach; ?>
       </tbody>
     </table>
+    <p id="no-results" style="display:none;color:#888;padding:8px 0">Keine Nutzer gefunden.</p>
   </div>
 </div>
+<script>
+(function () {
+  const rows    = Array.from(document.querySelectorAll('#user-table tbody tr'));
+  const counter = document.getElementById('user-count');
+  const noRes   = document.getElementById('no-results');
+
+  function applyFilter() {
+    const text   = document.getElementById('filter-text').value.toLowerCase();
+    const role   = document.getElementById('filter-role').value;
+    const status = document.getElementById('filter-status').value;
+    let visible  = 0;
+    rows.forEach(row => {
+      const match = (!text   || row.dataset.search.includes(text))
+                 && (!role   || row.dataset.role   === role)
+                 && (!status || row.dataset.status === status);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    counter.textContent = visible;
+    noRes.style.display = visible === 0 ? '' : 'none';
+  }
+
+  document.getElementById('filter-text').addEventListener('input', applyFilter);
+  document.getElementById('filter-role').addEventListener('change', applyFilter);
+  document.getElementById('filter-status').addEventListener('change', applyFilter);
+})();
+</script>
 <?php
 $content   = ob_get_clean();
 $pageTitle = 'Nutzerverwaltung';

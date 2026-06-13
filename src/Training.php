@@ -94,9 +94,9 @@ class Training {
         Database::execute(
             'INSERT INTO `trainings`
              (`public_id`, `creator_id`, `title`, `description`, `location`, `is_multi_part`,
-              `max_participants`, `waitlist_enabled`, `approval_mode`,
+              `capacity_mode`, `max_participants`, `waitlist_enabled`, `approval_mode`,
               `registration_deadline`, `status`)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $publicId,
                 $creatorId,
@@ -104,6 +104,7 @@ class Training {
                 $data['description'] ?? '',
                 $data['location'] ?? '',
                 (int)($data['is_multi_part'] ?? 0),
+                $data['capacity_mode'] ?? 'total',
                 !empty($data['max_participants']) ? (int)$data['max_participants'] : null,
                 (int)($data['waitlist_enabled'] ?? 1),
                 $data['approval_mode'] ?? 'auto',
@@ -118,7 +119,7 @@ class Training {
         Database::execute(
             'UPDATE `trainings` SET
              `title` = ?, `description` = ?, `location` = ?,
-             `is_multi_part` = ?, `max_participants` = ?,
+             `is_multi_part` = ?, `capacity_mode` = ?, `max_participants` = ?,
              `waitlist_enabled` = ?, `approval_mode` = ?,
              `registration_deadline` = ?, `status` = ?
              WHERE `id` = ?',
@@ -127,6 +128,7 @@ class Training {
                 $data['description'] ?? '',
                 $data['location'] ?? '',
                 (int)($data['is_multi_part'] ?? 0),
+                $data['capacity_mode'] ?? 'total',
                 !empty($data['max_participants']) ? (int)$data['max_participants'] : null,
                 (int)($data['waitlist_enabled'] ?? 1),
                 $data['approval_mode'] ?? 'auto',
@@ -147,8 +149,8 @@ class Training {
 
     public static function addSession(int $trainingId, array $data): int {
         Database::execute(
-            'INSERT INTO `training_sessions` (`training_id`, `session_number`, `title`, `start_datetime`, `end_datetime`, `location`, `notes`)
-             VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO `training_sessions` (`training_id`, `session_number`, `title`, `start_datetime`, `end_datetime`, `location`, `notes`, `max_participants`)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $trainingId,
                 $data['session_number'] ?? 1,
@@ -157,6 +159,7 @@ class Training {
                 $data['end_datetime'],
                 $data['location'] ?? '',
                 $data['notes'] ?? '',
+                !empty($data['max_participants']) ? (int)$data['max_participants'] : null,
             ]
         );
         return (int)Database::lastInsertId();
@@ -164,9 +167,17 @@ class Training {
 
     public static function updateSession(int $sessionId, array $data): void {
         Database::execute(
-            'UPDATE `training_sessions` SET `title` = ?, `start_datetime` = ?, `end_datetime` = ?, `location` = ?, `notes` = ?
+            'UPDATE `training_sessions` SET `title` = ?, `start_datetime` = ?, `end_datetime` = ?, `location` = ?, `notes` = ?, `max_participants` = ?
              WHERE `id` = ?',
-            [$data['title'] ?? '', $data['start_datetime'], $data['end_datetime'], $data['location'] ?? '', $data['notes'] ?? '', $sessionId]
+            [
+                $data['title'] ?? '',
+                $data['start_datetime'],
+                $data['end_datetime'],
+                $data['location'] ?? '',
+                $data['notes'] ?? '',
+                !empty($data['max_participants']) ? (int)$data['max_participants'] : null,
+                $sessionId,
+            ]
         );
     }
 
@@ -217,8 +228,21 @@ class Training {
     }
 
     public static function isFull(array $training): bool {
+        if (($training['capacity_mode'] ?? 'total') === 'per_session') {
+            $minCap = self::getMinSessionCapacity($training['id']);
+            if ($minCap === null) return false;
+            return self::getApprovedCount($training['id']) >= $minCap;
+        }
         if ($training['max_participants'] === null) return false;
         return self::getApprovedCount($training['id']) >= (int)$training['max_participants'];
+    }
+
+    public static function getMinSessionCapacity(int $trainingId): ?int {
+        $row = Database::fetchOne(
+            'SELECT MIN(`max_participants`) AS min_cap FROM `training_sessions` WHERE `training_id` = ? AND `max_participants` IS NOT NULL',
+            [$trainingId]
+        );
+        return ($row && $row['min_cap'] !== null) ? (int)$row['min_cap'] : null;
     }
 
     public static function getNextWaitlistPosition(int $trainingId): int {

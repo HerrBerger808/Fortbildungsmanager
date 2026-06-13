@@ -23,6 +23,7 @@ $data   = $training ?: [
     'description'           => '',
     'location'              => '',
     'is_multi_part'         => 0,
+    'capacity_mode'         => 'total',
     'max_participants'      => '',
     'waitlist_enabled'      => 1,
     'approval_mode'         => 'auto',
@@ -33,12 +34,14 @@ $data   = $training ?: [
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $post = $_POST;
 
+    $capacityMode = $post['capacity_mode'] ?? 'total';
     $data = [
         'title'                 => trim($post['title'] ?? ''),
         'description'           => trim($post['description'] ?? ''),
         'location'              => trim($post['location'] ?? ''),
         'is_multi_part'         => isset($post['is_multi_part']) ? 1 : 0,
-        'max_participants'      => $post['max_participants'] !== '' ? (int)$post['max_participants'] : null,
+        'capacity_mode'         => $capacityMode,
+        'max_participants'      => ($capacityMode === 'per_session') ? null : ($post['max_participants'] !== '' ? (int)$post['max_participants'] : null),
         'waitlist_enabled'      => isset($post['waitlist_enabled']) ? 1 : 0,
         'approval_mode'         => $post['approval_mode'] ?? 'auto',
         'registration_deadline' => !empty($post['registration_deadline']) ? $post['registration_deadline'] : null,
@@ -65,13 +68,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $start = $post['session_start'][$i] ?? '';
             $end   = $post['session_end'][$i] ?? '';
             if (!$start || !$end) continue;
+            $sessionMax = ($capacityMode === 'per_session' && isset($post['session_max'][$i]) && $post['session_max'][$i] !== '')
+                ? (int)$post['session_max'][$i] : null;
             $sData = [
-                'session_number' => $i + 1,
-                'title'          => $post['session_title'][$i] ?? '',
-                'start_datetime' => $start,
-                'end_datetime'   => $end,
-                'location'       => $post['session_location'][$i] ?? '',
-                'notes'          => $post['session_notes'][$i] ?? '',
+                'session_number'  => $i + 1,
+                'title'           => $post['session_title'][$i] ?? '',
+                'start_datetime'  => $start,
+                'end_datetime'    => $end,
+                'location'        => $post['session_location'][$i] ?? '',
+                'notes'           => $post['session_notes'][$i] ?? '',
+                'max_participants' => $sessionMax,
             ];
             if ($sid) {
                 Training::updateSession((int)$sid, $sData);
@@ -178,7 +184,20 @@ ob_start();
     <!-- Capacity -->
     <div class="card">
       <h2>Kapazität</h2>
-      <div class="form-row">
+      <div class="form-group" id="capacity-mode-group" style="<?= $data['is_multi_part'] ? '' : 'display:none' ?>">
+        <label>Teilnehmerzahl-Modus</label>
+        <div>
+          <label style="margin-right:16px">
+            <input type="radio" name="capacity_mode" value="total" <?= ($data['capacity_mode'] ?? 'total') !== 'per_session' ? 'checked' : '' ?>>
+            Gesamt (eine Zahl für alle Termine)
+          </label>
+          <label>
+            <input type="radio" name="capacity_mode" value="per_session" <?= ($data['capacity_mode'] ?? 'total') === 'per_session' ? 'checked' : '' ?>>
+            Pro Termin (jeder Termin hat eigene Begrenzung)
+          </label>
+        </div>
+      </div>
+      <div class="form-row" id="total-capacity-row" style="<?= ($data['capacity_mode'] ?? 'total') === 'per_session' ? 'display:none' : '' ?>">
         <div class="form-group">
           <label for="max_participants">Maximale Teilnehmerzahl</label>
           <input type="number" id="max_participants" name="max_participants" min="1"
@@ -190,6 +209,13 @@ ob_start();
           <label><input type="checkbox" name="waitlist_enabled" <?= $data['waitlist_enabled'] ? 'checked' : '' ?>>
             Warteliste aktivieren</label>
           <small>Bei ausgebuchter Fortbildung werden weitere Anmeldungen auf die Warteliste gesetzt.</small>
+        </div>
+      </div>
+      <div id="per-session-capacity-note" style="<?= ($data['capacity_mode'] ?? 'total') === 'per_session' ? '' : 'display:none' ?>">
+        <p class="hint">Die Teilnehmerzahl wird bei jedem Termin einzeln festgelegt (siehe unten). Als Gesamtkapazität gilt das Minimum aller Terminkapazitäten.</p>
+        <div class="form-group">
+          <label><input type="checkbox" name="waitlist_enabled" <?= $data['waitlist_enabled'] ? 'checked' : '' ?>>
+            Warteliste aktivieren</label>
         </div>
       </div>
       <div class="form-group">
@@ -294,6 +320,14 @@ ob_start();
                        value="<?= date('Y-m-d\TH:i', strtotime($s['end_datetime'])) ?>">
               </div>
             </div>
+            <div class="form-row session-max-row" style="<?= ($data['capacity_mode'] ?? 'total') === 'per_session' ? '' : 'display:none' ?>">
+              <div class="form-group">
+                <label>Max. Teilnehmer dieses Termins</label>
+                <input type="number" name="session_max[]" min="1"
+                       value="<?= htmlspecialchars($s['max_participants'] ?? '') ?>"
+                       placeholder="Unbegrenzt">
+              </div>
+            </div>
           </div>
         <?php endforeach; ?>
       </div>
@@ -311,6 +345,28 @@ ob_start();
 const genehmiger = <?= json_encode(array_map(fn($g) => ['id' => $g['id'], 'label' => $g['name'] ?: $g['email']], $genehmiger)) ?>;
 let sessionCount = <?= count($sessions) ?>;
 
+function isPerSession() {
+  return document.querySelector('input[name="capacity_mode"]:checked')?.value === 'per_session';
+}
+
+function updateCapacityUI() {
+  const perSession = isPerSession();
+  document.getElementById('total-capacity-row').style.display        = perSession ? 'none' : '';
+  document.getElementById('per-session-capacity-note').style.display = perSession ? '' : 'none';
+  document.querySelectorAll('.session-max-row').forEach(r => r.style.display = perSession ? '' : 'none');
+}
+
+document.querySelectorAll('input[name="capacity_mode"]').forEach(r => r.addEventListener('change', updateCapacityUI));
+
+// Show/hide capacity mode radio when multi-part changes
+document.querySelector('input[name="is_multi_part"]')?.addEventListener('change', function () {
+  document.getElementById('capacity-mode-group').style.display = this.checked ? '' : 'none';
+  if (!this.checked) {
+    document.querySelector('input[name="capacity_mode"][value="total"]').checked = true;
+    updateCapacityUI();
+  }
+});
+
 function autoFillEndTime(row) {
   const startEl = row.querySelector('input[name="session_start[]"]');
   const endEl   = row.querySelector('input[name="session_end[]"]');
@@ -319,7 +375,6 @@ function autoFillEndTime(row) {
     if (!this.value) return;
     const start = new Date(this.value);
     if (isNaN(start)) return;
-    // Only fill if end is still empty or equal to start+1h from previous start
     const expected = endEl.dataset.autoEnd || '';
     if (endEl.value === '' || endEl.value === expected) {
       start.setHours(start.getHours() + 1);
@@ -354,6 +409,7 @@ document.querySelectorAll('.remove-approver').forEach(btn => {
 document.getElementById('add-session').addEventListener('click', () => {
   const container = document.getElementById('sessions-list');
   const idx = sessionCount++;
+  const perSession = isPerSession();
   const div = document.createElement('div');
   div.className = 'session-row card-inner';
   div.innerHTML = `
@@ -380,6 +436,12 @@ document.getElementById('add-session').addEventListener('click', () => {
       <div class="form-group">
         <label>Ende <span class="required">*</span></label>
         <input type="datetime-local" name="session_end[]" required>
+      </div>
+    </div>
+    <div class="form-row session-max-row" style="${perSession ? '' : 'display:none'}">
+      <div class="form-group">
+        <label>Max. Teilnehmer dieses Termins</label>
+        <input type="number" name="session_max[]" min="1" placeholder="Unbegrenzt">
       </div>
     </div>`;
   container.appendChild(div);

@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS `trainings` (
   `description` TEXT,
   `location` VARCHAR(255),
   `is_multi_part` TINYINT(1) NOT NULL DEFAULT 0,
+  `capacity_mode` ENUM('total','per_session') NOT NULL DEFAULT 'total',
   `max_participants` INT UNSIGNED DEFAULT NULL,
   `waitlist_enabled` TINYINT(1) NOT NULL DEFAULT 1,
   `approval_mode` ENUM('auto','manual_individual','manual_bulk') NOT NULL DEFAULT 'auto',
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS `training_sessions` (
   `end_datetime` DATETIME NOT NULL,
   `location` VARCHAR(255),
   `notes` TEXT,
+  `max_participants` INT UNSIGNED DEFAULT NULL,
   FOREIGN KEY (`training_id`) REFERENCES `trainings`(`id`) ON DELETE CASCADE,
   INDEX `idx_training` (`training_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
