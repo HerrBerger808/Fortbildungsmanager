@@ -4,7 +4,7 @@
 
 require_once dirname(__DIR__) . '/bootstrap.php';
 
-$pdo = Database::pdo();
+$pdo = Database::getInstance();
 
 echo "=== Migrate: Session Capacity ===\n\n";
 
